@@ -4,7 +4,7 @@ public class StrategyFactory {
 	
 	public static StrategyFactory sharedInstance;
 	
-	public TrapStrategy timeBestStrategy;
+	//public TrapStrategy timeBestStrategy;
 	
 	//Lazy initialization
 	public static StrategyFactory getSharedInstance() {
@@ -44,7 +44,6 @@ public class StrategyFactory {
 	
 	public TrapStrategy getHealthBestStrategy() {
 		TrapStrategy strategy = null;
-		//String className = System.getProperty("strategy.HealthBestStrategy");
 		String className = "strategy.HealthBestStrategy";
 		try {
 			strategy = (HealthBestStrategy) Class.forName(className).newInstance();
@@ -63,7 +62,6 @@ public class StrategyFactory {
 	
 	public TrapStrategy getTimeBestStrategy() {
 		TrapStrategy strategy = null;
-		//String className = System.getProperty("strategy.HealthBestStrategy");
 		String className = "strategy.TimeBestStrategy";
 		try {
 			strategy = (TimeBestStrategy) Class.forName(className).newInstance();
@@ -82,7 +80,6 @@ public class StrategyFactory {
 	
 	public TrapStrategy getControlBestStrategy() {
 		TrapStrategy strategy = null;
-		//String className = System.getProperty("strategy.HealthBestStrategy");
 		String className = "strategy.ControlBestStrategy";
 		try {
 			strategy = (ControlBestStrategy) Class.forName(className).newInstance();
@@ -99,10 +96,38 @@ public class StrategyFactory {
 		return strategy;
 	}
 	
+	public DeadEndStrategy getCompositeDeadEndStrategy() {
+		CompositeDeadEndStrategy compositeDeadEndStrategy = null;
+		String className = "strategy.CompositeDeadEndStrategy";
+		try {
+			compositeDeadEndStrategy = (CompositeDeadEndStrategy)Class.forName(className).newInstance();
+			
+			DeadEndStrategy reverseStrategy = this.getReverseOutStrategy();
+			DeadEndStrategy threePointStrategy = this.getThreePointTurnStrategy();
+			DeadEndStrategy uTurnStrategy = this.getUturnStrategy();
+			
+			compositeDeadEndStrategy.addStrategy(uTurnStrategy);
+			compositeDeadEndStrategy.addStrategy(reverseStrategy);
+			compositeDeadEndStrategy.addStrategy(threePointStrategy);
+			
+		} catch (InstantiationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return compositeDeadEndStrategy;
+	}
+	
 	public DeadEndStrategy getUturnStrategy() {
 		DeadEndStrategy strategy = null;
-		//String className = System.getProperty("strategy.HealthBestStrategy");
-		String className = "strategy.ControlBestStrategy";
+		
+		String className = "strategy.UturnStrategy";
 		try {
 			strategy = (DeadEndStrategy) Class.forName(className).newInstance();
 		} catch (InstantiationException e) {
@@ -121,8 +146,8 @@ public class StrategyFactory {
 	
 	public DeadEndStrategy getThreePointTurnStrategy() {
 		DeadEndStrategy strategy = null;
-		//String className = System.getProperty("strategy.HealthBestStrategy");
-		String className = "strategy.ControlBestStrategy";
+		
+		String className = "strategy.ThreePointTurnStrategy";
 		try {
 			strategy = (DeadEndStrategy) Class.forName(className).newInstance();
 		} catch (InstantiationException e) {
@@ -141,7 +166,7 @@ public class StrategyFactory {
 	
 	public DeadEndStrategy getReverseOutStrategy() {
 		DeadEndStrategy strategy = null;
-		//String className = System.getProperty("strategy.HealthBestStrategy");
+		
 		String className = "strategy.ReverseOutStrategy";
 		try {
 			strategy = (DeadEndStrategy) Class.forName(className).newInstance();

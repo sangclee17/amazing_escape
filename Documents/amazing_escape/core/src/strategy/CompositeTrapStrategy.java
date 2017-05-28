@@ -2,7 +2,6 @@ package strategy;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 
 import controller.AIController;
@@ -22,135 +21,130 @@ public class CompositeTrapStrategy implements TrapStrategy {
 	}
 
 	@Override
-	public boolean checkTrapAhead(AIController ai) {
-	
+	public boolean traverse(AIController ai) {
 		HashMap<Coordinate, MapTile> currentView = ai.getView();
 		WorldSpatial.Direction orientation = ai.getOrientation();
 		Coordinate currentPosition = new Coordinate(ai.getPosition());
 		
-		HashMap<String,Integer> traps = new HashMap<String,Integer>();
-		traps.clear();
-		
-		int lavaTrap = 0;
-		int mudTrap = 0;
-		int grassTrap = 0;
-
-		switch(orientation){
+		switch(orientation) {
 		case NORTH:
-			for(int i = 0; i <= 2; i++){
-				for(int j = 0; j <= 2; j++) {
-					MapTile tile = currentView.get(new Coordinate(currentPosition.x + i, currentPosition.y + j));
-					if(tile.getName().equals("Trap")) {
-						if (tile instanceof LavaTrap) {
-							lavaTrap += 1;
-						}
-						else if (tile instanceof MudTrap) {
-							mudTrap += 1;
-						}
-						else if (tile instanceof GrassTrap) {
-							grassTrap += 1;
-						}
+				for(int i = 0; i <= 2; i++) {
+					MapTile tile = currentView.get(new Coordinate(currentPosition.x, currentPosition.y + i));
+					if (tile instanceof LavaTrap) {
+						return trapStrategyList.get(0).traverse(ai);
+					}
+					else if (tile instanceof MudTrap) {
+						return trapStrategyList.get(1).traverse(ai);
+					}
+					else if (tile instanceof GrassTrap) {
+						return trapStrategyList.get(2).traverse(ai);
 					}
 				}
-			}
-			break;
-		case EAST:
-			for(int i = 0; i <= 2; i++){
-				for(int j = 0; j <= 2; j++) {
-					MapTile tile = currentView.get(new Coordinate(currentPosition.x + j, currentPosition.y - i));
-					if(tile.getName().equals("Trap")) {
-						if (tile instanceof LavaTrap) {
-							lavaTrap += 1;
-						}
-						else if (tile instanceof MudTrap) {
-							mudTrap += 1;
-						}
-						else if (tile instanceof GrassTrap) {
-							grassTrap += 1;
-						}
-					}
-				}
-			}
-			break;
 		case SOUTH:
-			for(int i = 0; i <= 2; i++){
-				for(int j = 0; j <= 2; j++) {
-					MapTile tile = currentView.get(new Coordinate(currentPosition.x - i, currentPosition.y - j));
-					if(tile.getName().equals("Trap")) {
-						if (tile instanceof LavaTrap) {
-							lavaTrap += 1;
-						}
-						else if (tile instanceof MudTrap) {
-							mudTrap += 1;
-						}
-						else if (tile instanceof GrassTrap) {
-							grassTrap += 1;
-						}
-					}
+			for(int i = 0; i <= 2; i++) {
+				MapTile tile = currentView.get(new Coordinate(currentPosition.x, currentPosition.y - i));
+				if (tile instanceof LavaTrap) {
+					return trapStrategyList.get(0).traverse(ai);
+				}
+				else if (tile instanceof MudTrap) {
+					return trapStrategyList.get(1).traverse(ai);
+				}
+				else if (tile instanceof GrassTrap) {
+					return trapStrategyList.get(2).traverse(ai);
 				}
 			}
-			break;
+		case EAST:
+			for(int i = 0; i <= 2; i++) {
+				MapTile tile = currentView.get(new Coordinate(currentPosition.x + i, currentPosition.y));
+				if (tile instanceof LavaTrap) {
+					return trapStrategyList.get(0).traverse(ai);
+				}
+				else if (tile instanceof MudTrap) {
+					return trapStrategyList.get(1).traverse(ai);
+				}
+				else if (tile instanceof GrassTrap) {
+					return trapStrategyList.get(2).traverse(ai);
+				}
+			}
 		case WEST:
-			for(int i = 0; i <= 2; i++){
-				for(int j = 0; j <= 2; j++) {
-					MapTile tile = currentView.get(new Coordinate(currentPosition.x - j, currentPosition.y + i));
-					if(tile.getName().equals("Trap")) {
-						if (tile instanceof LavaTrap) {
-							lavaTrap += 1;
-						}
-						else if (tile instanceof MudTrap) {
-							mudTrap += 1;
-						}
-						else if (tile instanceof GrassTrap) {
-							grassTrap += 1;
-						}
-					}
+			for(int i = 0; i <= 2; i++) {
+				MapTile tile = currentView.get(new Coordinate(currentPosition.x - i, currentPosition.y));
+				if (tile instanceof LavaTrap) {
+					return trapStrategyList.get(0).traverse(ai);
+				}
+				else if (tile instanceof MudTrap) {
+					return trapStrategyList.get(1).traverse(ai);
+				}
+				else if (tile instanceof GrassTrap) {
+					return trapStrategyList.get(2).traverse(ai);
 				}
 			}
-			break;
-			
 		default:
-			System.out.println("undefined orientation");
-			return false;
-		}
-		
-		traps.put("lavaTrap",lavaTrap);
-		traps.put("mudTrap",mudTrap);
-		traps.put("grassTrap",grassTrap);
-		
-		Iterator<String> itr = traps.keySet().iterator();
-		String maxTrapType = itr.next();
-		Integer max = traps.get(maxTrapType);
-		while(itr.hasNext()) {
-		    String k = itr.next();
-		    Integer val = traps.get(k);
-		    if (val > max){
-		         max = val;
-		         maxTrapType = k;
-		    }
-		}
-		
-		if (maxTrapType.equals("lavaTrap")) {
-			System.out.println("lava");
-			return trapStrategyList.get(0).checkTrapAhead(ai);
-		}
-		else if (maxTrapType.equals("mudTrap")) {
-			System.out.println("mud");
-			return trapStrategyList.get(1).checkTrapAhead(ai);
-		}
-		else if (maxTrapType.equals("grassTrap")){
-			System.out.println("grass");
-			return trapStrategyList.get(2).checkTrapAhead(ai);
-		}
-		else{
-			System.out.println("composite doesn't know what strategy to use");
-			return false;
+		return false;
 		}
 	}
 
 	@Override
-	public boolean checkFollowingTrap(AIController ai) {
-		return trapStrategyList.get(0).checkFollowingTrap(ai);
+	public boolean keepFollowingTrap(AIController ai) {
+		HashMap<Coordinate, MapTile> currentView = ai.getView();
+		WorldSpatial.Direction orientation = ai.getOrientation();
+		Coordinate currentPosition = new Coordinate(ai.getPosition());
+		
+		switch(orientation) {
+		case NORTH:
+				for(int i = 0; i <= 2; i++) {
+					MapTile tile = currentView.get(new Coordinate(currentPosition.x, currentPosition.y + i));
+					if (tile instanceof LavaTrap) {
+						return trapStrategyList.get(0).keepFollowingTrap(ai);
+					}
+					else if (tile instanceof MudTrap) {
+						return trapStrategyList.get(1).keepFollowingTrap(ai);
+					}
+					else if (tile instanceof GrassTrap) {
+						return trapStrategyList.get(2).keepFollowingTrap(ai);
+					}
+				}
+		case SOUTH:
+			for(int i = 0; i <= 2; i++) {
+				MapTile tile = currentView.get(new Coordinate(currentPosition.x, currentPosition.y - i));
+				if (tile instanceof LavaTrap) {
+					return trapStrategyList.get(0).keepFollowingTrap(ai);
+				}
+				else if (tile instanceof MudTrap) {
+					return trapStrategyList.get(1).keepFollowingTrap(ai);
+				}
+				else if (tile instanceof GrassTrap) {
+					return trapStrategyList.get(2).keepFollowingTrap(ai);
+				}
+			}
+		case EAST:
+			for(int i = 0; i <= 2; i++) {
+				MapTile tile = currentView.get(new Coordinate(currentPosition.x + i, currentPosition.y));
+				if (tile instanceof LavaTrap) {
+					return trapStrategyList.get(0).keepFollowingTrap(ai);
+				}
+				else if (tile instanceof MudTrap) {
+					return trapStrategyList.get(1).keepFollowingTrap(ai);
+				}
+				else if (tile instanceof GrassTrap) {
+					return trapStrategyList.get(2).keepFollowingTrap(ai);
+				}
+			}
+		case WEST:
+			for(int i = 0; i <= 2; i++) {
+				MapTile tile = currentView.get(new Coordinate(currentPosition.x - i, currentPosition.y));
+				if (tile instanceof LavaTrap) {
+					return trapStrategyList.get(0).keepFollowingTrap(ai);
+				}
+				else if (tile instanceof MudTrap) {
+					return trapStrategyList.get(1).keepFollowingTrap(ai);
+				}
+				else if (tile instanceof GrassTrap) {
+					return trapStrategyList.get(2).keepFollowingTrap(ai);
+				}
+			}
+		default:
+		return false;
+		}
 	}
-
 }

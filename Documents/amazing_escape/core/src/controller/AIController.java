@@ -1,12 +1,10 @@
 package controller;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import strategy.*;
-import tiles.GrassTrap;
-import tiles.LavaTrap;
 import tiles.MapTile;
-import tiles.MudTrap;
 import utilities.Coordinate;
 import world.Car;
 import world.WorldSpatial;
@@ -15,7 +13,7 @@ public class AIController extends CarController {
 
 	// How many minimum units the wall is away from the player.
 	private int wallSensitivity = 2;
-	public int trapSensitivity = 1;
+	public int trapSensitivity = 2;
 
 
 	private boolean isFollowingWall = false; // This is initialized when the car sticks to a wall.
@@ -25,20 +23,23 @@ public class AIController extends CarController {
 	private WorldSpatial.Direction previousState = null; // Keeps track of the previous state
 	private boolean isReverse = false;
 
+	private ArrayList<MapTile> deadEndTiles = new ArrayList<MapTile>();
+
 	// Car Speed to move at
 	private final float CAR_SPEED = 3;
 
 	// Offset used to differentiate between 0 and 360 degrees
 	private int EAST_THRESHOLD = 3;
 
-	private TrapStrategy strategy;
+	private TrapStrategy trapStrategy;
 	private DeadEndStrategy deadStrategy;
 
 	public AIController(Car car) {
 		super(car);
-		//strategy = StrategyFactory.getSharedInstance().getCompositeTrapStrategy();
-		strategy = StrategyFactory.getSharedInstance().getTimeBestStrategy();
-		deadStrategy = StrategyFactory.getSharedInstance().getReverseOutStrategy();
+		
+		//Instantiate two composite strategy classed for trap and dead end.
+		trapStrategy = StrategyFactory.getSharedInstance().getCompositeTrapStrategy();
+		deadStrategy = StrategyFactory.getSharedInstance().getCompositeDeadEndStrategy();
 	}
 
 	@Override
@@ -47,9 +48,7 @@ public class AIController extends CarController {
 		// Gets what the car can see
 		HashMap<Coordinate, MapTile> currentView = getView();
 
-
 		checkStateChange();
-
 
 		// If you are not following a wall initially, find a wall to stick to!
 		if(!isFollowingWall){
@@ -78,13 +77,12 @@ public class AIController extends CarController {
 			readjust(lastTurnDirection,delta);
 
 			if(isTurningRight){
-					applyRightTurn(getOrientation(),delta);
-				
+				applyRightTurn(getOrientation(),delta);
+
 			}
 			else if(isTurningLeft){
-				if(!checkFollowingWall(getOrientation(),currentView) && !deadStrategy.isDeadEnd(this)
-						&&!checkFollowingTrap(getOrientation(),currentView)) { 
-					//System.out.println("left turn applied");
+				//The car can turn left only when it follows wall and does not head to the dead end road.
+				if(!checkFollowingWall(getOrientation(),currentView) && !isDeadEnd(getOrientation(),currentView)) { 
 					applyLeftTurn(getOrientation(),delta);
 				}
 
@@ -94,94 +92,102 @@ public class AIController extends CarController {
 			}
 			
 			else if(isReverse) {
-				applyReverseAcceleration();
+				deadStrategy.getOutOfDeadEnd(this);
 				if(deadStrategy.outOfDeadEnd(this)) {
 					lastTurnDirection = WorldSpatial.RelativeDirection.RIGHT;
 					isTurningRight = true;	
 					isReverse = false;
 				}
 			}
+
+			else if (checkFollowingWall(getOrientation(),currentView)) {
+				if (getVelocity() < CAR_SPEED){
+					applyForwardAcceleration();
+				}
+				
+				// If there is dead end ahead, delegates to dead end strategy
+				if(checkDeadEnd(getOrientation(),currentView)) {
+					applyBrake();
+					deadStrategy.getOutOfDeadEnd(this);
+					return;
+				}
+
+				// If there is wall ahead, turn right!
+				if(checkWallAhead(getOrientation(),currentView)){
+					lastTurnDirection = WorldSpatial.RelativeDirection.RIGHT;
+					isTurningRight = true;	
+					return;
+				}
+
+				// If there is trap ahead, delegates to trap strategy.
+				if(checkTrapAhead(getOrientation(),currentView)) {
+					if(!trapStrategy.traverse(this)) {
+						applyRightTurn(getOrientation(),delta);
+						System.out.println("make a right turn");
+						lastTurnDirection = WorldSpatial.RelativeDirection.RIGHT;
+						isTurningRight = true;
+					}
+				}
+			}
 			
 			else if(checkFollowingTrap(getOrientation(),currentView)) {
-				System.out.println("following traps");
-				if(strategy.keepFollowingTrap(this)) {
-					
+				
+				//When the car follows traps, trap strategy decides whether to keep following traps
+				if(trapStrategy.keepFollowingTrap(this)) {
 					if (getVelocity() < CAR_SPEED){
 						applyForwardAcceleration();
 					}
-					
-					if(deadStrategy.detectDeadEnd(this)) {
-						System.out.println("detect dead end");
+
+					if(checkDeadEnd(getOrientation(),currentView)) {
 						applyBrake();
 						isReverse = true;
 						return;
 					}
 
 					if(checkTrapAhead(getOrientation(),currentView)) {
-						if(!strategy.traverse(this)) {
-							System.out.println("there is trap ahead");
+						if(!trapStrategy.traverse(this)) {
+							applyRightTurn(getOrientation(),delta);
 							lastTurnDirection = WorldSpatial.RelativeDirection.RIGHT;
 							isTurningRight = true;
 						}
 						return;
 					}
-					
-					// If there is wall ahead, turn right!
+
 					if(checkWallAhead(getOrientation(),currentView)){
-						System.out.println("there is wall ahead");
+						applyRightTurn(getOrientation(),delta);
 						lastTurnDirection = WorldSpatial.RelativeDirection.RIGHT;
 						isTurningRight = true;	
 						return;
 					}
-					return;
 				}
-				if(!checkFollowingWall(getOrientation(),currentView) && !deadStrategy.isDeadEnd(this)) { 
-					System.out.println("left turn applied");
+				//If the car does not follow traps, left turn to find the wall to drive along
+				else {
 					applyLeftTurn(getOrientation(),delta);
+					lastTurnDirection = WorldSpatial.RelativeDirection.LEFT;
+					isTurningLeft = true;
+
+					if (getVelocity() < CAR_SPEED){
+						applyForwardAcceleration();
+					}
 				}
-			}
-			
-			else if (checkFollowingWall(getOrientation(),currentView)) {
-				System.out.println("check Following wall");
+			}	
+			// This indicates that I can do a left turn if I am not turning right
+			else{
+
+				lastTurnDirection = WorldSpatial.RelativeDirection.LEFT;
+				isTurningLeft = true;
+
 				if (getVelocity() < CAR_SPEED){
 					applyForwardAcceleration();
 				}
+				applyLeftTurn(getOrientation(),delta);
 				
-				if(deadStrategy.detectDeadEnd(this)) {
-					System.out.println("detect dead end");
-					applyBrake();
-					isReverse = true;
-					return;
-				}
-
-				if(checkTrapAhead(getOrientation(),currentView)) {
-					System.out.println("there is trap ahead");
-					if(!strategy.traverse(this)) {
-						System.out.println("make a right turn");
-						lastTurnDirection = WorldSpatial.RelativeDirection.RIGHT;
-						isTurningRight = true;
-					}
-					return;
-				}
-				
-				// If there is wall ahead, turn right!
-				if(checkWallAhead(getOrientation(),currentView)){
-					System.out.println("there is wall ahead");
+				// right turn only when the car faces wall while following dead end tiles
+				if(checkWallAhead(getOrientation(),currentView) && isDeadEnd(getOrientation(),currentView)){
 					lastTurnDirection = WorldSpatial.RelativeDirection.RIGHT;
 					isTurningRight = true;	
 					return;
 				}
-			}
-
-			// This indicates that I can do a left turn if I am not turning right
-			else{
-				lastTurnDirection = WorldSpatial.RelativeDirection.LEFT;
-				isTurningLeft = true;
-				
-				if (getVelocity() < CAR_SPEED){
-					applyForwardAcceleration();
-				}
-				System.out.println("doesn't follow anything");
 			}
 
 		}	
@@ -449,7 +455,7 @@ public class AIController extends CarController {
 		}
 		return false;
 	}
-	
+
 	private boolean checkTrapAhead(WorldSpatial.Direction orientation, HashMap<Coordinate, MapTile> currentView){
 		switch(orientation){
 		case EAST:
@@ -465,7 +471,7 @@ public class AIController extends CarController {
 
 		}
 	}
-	
+
 	private boolean checkFollowingTrap(WorldSpatial.Direction orientation, HashMap<Coordinate, MapTile> currentView) {
 		switch(orientation){
 		case EAST:
@@ -480,7 +486,7 @@ public class AIController extends CarController {
 			return false;
 		}
 	}
-	
+
 	public boolean checkEastForTrap(HashMap<Coordinate, MapTile> currentView){
 		// Check tiles to my right
 		Coordinate currentPosition = new Coordinate(getPosition());
@@ -528,4 +534,112 @@ public class AIController extends CarController {
 		}
 		return false;
 	}
+	/*
+	 * Detect dead end when the car is surrounded by walls
+	 * and faces either walls or traps
+	 * */
+	public boolean checkDeadEnd(WorldSpatial.Direction orientation, HashMap<Coordinate, MapTile> currentView) {
+
+		switch(orientation){
+		case NORTH:
+			if(checkEast(currentView) && checkWest(currentView)) {
+				if (checkNorth(currentView) || checkNorthForTrap(currentView)) {
+					return true;
+				}
+			}
+			return false;
+		case EAST:
+			if(checkNorth(currentView) && checkSouth(currentView)) {
+				if (checkEast(currentView) || checkEastForTrap(currentView)) {
+					return true;
+				}
+			}
+			return false;
+		case SOUTH:
+			if(checkEast(currentView) && checkWest(currentView)) {
+				if (checkSouth(currentView) || checkSouthForTrap(currentView)) {
+					return true;
+				}
+			}
+			return false;
+		case WEST:
+			if(checkNorth(currentView) && checkSouth(currentView)) {
+				if (checkWest(currentView) || checkWestForTrap(currentView)) {
+					return true;
+				}
+			}
+			return false;
+		default:
+			return false;
+		}
+	}
+
+	/*
+	 * The entrance to the dead end is indicated and blocked for the car after getting out of dead end.
+	 * */
+	public boolean isDeadEnd(WorldSpatial.Direction orientation,HashMap<Coordinate, MapTile> currentView) {
+
+		if(deadEndTiles.isEmpty()) {
+			return false;
+		}
+
+		Coordinate currentPosition = new Coordinate(getPosition());
+
+		switch(orientation){
+		case EAST:
+			//check North
+			for(int i = 0; i <= 2; i++){
+				MapTile tile = currentView.get(new Coordinate(currentPosition.x, currentPosition.y + i));
+				if(deadEndTiles.contains(tile)){
+					return true;
+				}
+			}
+			return false;
+		case WEST:
+			//check South
+			for(int i = 0; i <= 2; i++){
+				MapTile tile = currentView.get(new Coordinate(currentPosition.x, currentPosition.y - i));
+				if(deadEndTiles.contains(tile)){
+					return true;
+				}
+			}
+			return false;
+		case NORTH:
+			//check West
+			for(int i = 0; i <= 2; i++){
+				MapTile tile = currentView.get(new Coordinate(currentPosition.x - i, currentPosition.y));
+				if(deadEndTiles.contains(tile)){
+					return true;
+				}
+			}
+			return false;
+		case SOUTH:
+			//check East
+			for(int i = 0; i <= 2; i++){
+				MapTile tile = currentView.get(new Coordinate(currentPosition.x + i, currentPosition.y));
+				if(deadEndTiles.contains(tile)){
+					return true;
+				}
+			}
+			return false;
+		default:
+			return false;
+		}
+	}
+	public void addDeadEndTiles(MapTile deadTile) {
+		deadEndTiles.add(deadTile);
+	}
+	
+	public void removeAllDeadEndTiles() {
+		deadEndTiles.clear();
+	}
+
+	public void setReverse(boolean reverse) {
+		this.isReverse = reverse;
+	}
+	
+	public void setRightTurning(boolean rightTurn) {
+		this.isTurningRight = rightTurn;
+	}
+
 }
